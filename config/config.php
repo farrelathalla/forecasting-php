@@ -37,8 +37,24 @@ return [
     ],
 
     'ingest' => [
-        // API is a snapshot endpoint, so the poll interval sets our history resolution.
-        'poll_interval_sec' => 60,
+        // The API is a snapshot endpoint, so the poll interval IS our history
+        // resolution — values between two polls are gone for good.
+        //
+        // Measured on 2026-07-29: updated_at advances every 5 s, which confirms F6's
+        // finding that the historian polls at 5 s. So 5 is the floor worth using and
+        // anything faster only re-reads the same tick. 10 s captures every other tick
+        // at ~138k rows/day, close to the historian's own recording rate.
+        'poll_interval_sec' => 10,
+    ],
+
+    'retention' => [
+        // Raw readings are the reconstruction input; once folded into the 15-minute
+        // grid their job is done. The grid itself is never pruned.
+        'readings_days'    => 30,
+        'forecasts_days'   => 90,
+        'job_log_days'     => 30,
+        'spc_days'         => 365,
+        'projections_days' => 365,
     ],
 
     'alarm' => [

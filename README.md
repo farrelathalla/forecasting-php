@@ -88,12 +88,43 @@ php -S 127.0.0.1:8080 -t public
 
 | Job | Interval | Perintah |
 |---|---|---|
-| poll | 1 menit | `C:\xampp\php\php.exe <repo>\bin\poll.php` |
+| poll | 10 detik | `C:\xampp\php\php.exe <repo>\bin\poll.php` |
 | aggregate | 5 menit | `C:\xampp\php\php.exe <repo>\bin\aggregate.php` |
 | forecast | 15 menit | `C:\xampp\php\php.exe <repo>\bin\forecast.php` |
 | evaluate | 15 menit | `C:\xampp\php\php.exe <repo>\bin\evaluate.php` |
+| **prune** | **harian** | `C:\xampp\php\php.exe <repo>\bin\prune.php` |
+
+Task Scheduler tidak bisa di bawah 1 menit, jadi untuk polling 10 detik pakai
+`bin\poll_loop.php --interval=10` atau `bin\run_all.php --daemon` (keduanya loop sendiri).
 
 Semua job **idempoten** — jalan dobel atau terlambat tidak menggandakan baris.
+
+### Laju poll = resolusi histori
+
+`latest.php` adalah endpoint **snapshot**: nilai di antara dua poll hilang selamanya, tidak
+ada endpoint range untuk mengambilnya kembali. Jadi laju poll bukan setelan performa, dia
+menentukan seberapa halus histori yang akan pernah kita punya.
+
+**Diukur 2026-07-29:** `updated_at` maju **tiap 5 detik** — konfirmasi lapangan atas temuan
+F6 bahwa historian polling 5 detik. Jadi 5 detik adalah lantai yang berguna; lebih cepat
+hanya membaca ulang tick yang sama.
+
+| Interval | Baris/hari (16 tag) | Catatan |
+|---|---|---|
+| 60 s | 23 rb | terlalu kasar untuk grafik live |
+| **10 s** (default) | **138 rb** | menangkap satu dari dua tick; ≈ laju rekam historian sendiri (119 rb/hari) |
+| 5 s | 276 rb | menangkap semua tick |
+
+Ubah lewat `.env`:
+
+```
+TBW_INGEST_POLL_INTERVAL_SEC=10
+```
+
+**Naikkan laju berarti wajib menjadwalkan `bin/prune.php`.** Pada 10 detik `reading_raw`
+tumbuh ~50 juta baris/tahun. Yang dipangkas hanya bacaan mentah (default 30 hari) — grid
+15 menit **tidak pernah** dipangkas, karena dialah penyimpan jangka panjang tempat semua
+target, skor dan nilai SPC dibangun.
 
 ---
 
@@ -165,7 +196,7 @@ tertinggi yang tersedia.
 ## Struktur
 
 ```
-bin/            job CLI (poll, aggregate, forecast, evaluate, seed, migrate, run_all)
+bin/            job CLI (poll, aggregate, forecast, evaluate, seed, migrate, prune, run_all)
 config/         konfigurasi, batas SPC beku, limit proyeksi
 db/schema.sql   skema (idempoten)
 public/         docroot XAMPP: halaman + endpoint JSON + aset
@@ -185,4 +216,6 @@ var/            file kerja (di-gitignore)
 | Semua target NULL | `bin/aggregate.php` belum jalan, atau belum ada bacaan mentah |
 | Forecast dilewati "thin history" | Konteks < 2 hari. Jalankan `bin/seed_history.php` |
 | Papan skor kosong | Normal selama 24 jam pertama — run baru dinilai setelah jendelanya matang penuh |
+| `reading_raw` membengkak | `bin/prune.php` belum dijadwalkan. Cek ukurannya dengan `bin/prune.php --dry-run` |
+| Grafik live tidak bergerak | Poller mati. Cek `var/pipeline.log` dan tabel `job_run` |
 | `curl error 60` saat poll | Tidak ada CA bundle. Set `TBW_API_VERIFY_TLS=false` **hanya** di jaringan tepercaya |

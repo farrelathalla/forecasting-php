@@ -27,7 +27,11 @@ $to = $opts['to'] ?? date('Y-m-d H:i:s');
 if (isset($opts['from'])) {
     $from = $opts['from'];
 } else {
-    $days = (float) ($opts['days'] ?? 2);
+    // 12 hours by default. At a 10 s poll interval a 2-day window would pull ~276k raw
+    // rows into PHP memory at once, and 12 h is already far more slack than any
+    // late-arriving reading needs.  Use --days explicitly for a wider rebuild, with
+    // php -d memory_limit=1G.
+    $days = (float) ($opts['days'] ?? 0.5);
     $from = (new DateTimeImmutable($to))->modify('-' . (int) round($days * 24) . ' hours')->format('Y-m-d H:i:s');
     // Never reach back before the first reading we actually hold.
     $earliest = $readings->minObservedAt();
