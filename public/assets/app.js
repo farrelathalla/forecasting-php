@@ -13,7 +13,11 @@
       el.textContent = d.toLocaleString('id-ID', { hour12: false });
     }
   }
+  // This file is loaded in <head>, before the DOM exists, so that inline scripts further
+  // down the page can call fetchJson/drawChart. tick() is null-safe; the listener below
+  // paints the clock as soon as there is something to paint.
   tick();
+  document.addEventListener('DOMContentLoaded', tick);
   setInterval(tick, 1000);
 
   function css(name) {

@@ -190,11 +190,17 @@ final class ForecastClient
         );
     }
 
-    /** @return array<string,mixed> */
-    public function health(): array
+    /**
+     * Short timeout on purpose. The dashboard calls this on every page load, and a
+     * sidecar that is slow or wedged must never be able to hang the UI — an operator
+     * staring at a blank page learns less than one reading "sidecar: DOWN".
+     *
+     * @return array<string,mixed>
+     */
+    public function health(int $timeoutSec = 3): array
     {
         try {
-            $response = $this->transport->getJson($this->baseUrl . '/health', 10);
+            $response = $this->transport->getJson($this->baseUrl . '/health', $timeoutSec);
             if (!$response->isOk()) {
                 return ['status' => 'unavailable', 'error' => 'HTTP ' . $response->status];
             }

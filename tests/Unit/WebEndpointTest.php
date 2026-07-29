@@ -35,7 +35,19 @@ final class WebEndpointTest extends DbTestCase
             return;
         }
         $root = dirname(__DIR__, 2);
-        $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+
+        // Log to files, never to pipes. The built-in server writes one access-log line
+        // per request to stderr; with an unread pipe the OS buffer fills after a few
+        // dozen requests and the server blocks forever on write. That looked exactly
+        // like a page failing at random partway through the suite.
+        $var = $root . '/var';
+        if (!is_dir($var)) {
+            mkdir($var, 0777, true);
+        }
+        $descriptors = [
+            1 => ['file', $var . '/test-server.log', 'a'],
+            2 => ['file', $var . '/test-server.log', 'a'],
+        ];
 
         // Point the server at the test database, not production. Without this the
         // "survives an empty database" test would read real rows and pass for the
@@ -45,6 +57,9 @@ final class WebEndpointTest extends DbTestCase
             'PATH'        => getenv('PATH') ?: '',
             'SystemRoot'  => getenv('SystemRoot') ?: 'C:\\Windows',
             'TEMP'        => getenv('TEMP') ?: '',
+            // The built-in server is single-worker by default, so one page waiting on
+            // an outbound call blocks every later request in the suite.
+            'PHP_CLI_SERVER_WORKERS' => '4',
         ];
 
         $process = proc_open(
@@ -175,6 +190,40 @@ final class WebEndpointTest extends DbTestCase
         $result = $this->run('index.php');
         $this->assertStringContains('RETIRED', $result['stdout']);
         $this->assertStringContains('TBW2', $result['stdout']);
+    }
+
+    public function testHelperScriptLoadsBeforeAnyInlineScriptThatUsesIt(): void
+    {
+        // Regression: app.js used to sit at the end of <body>, so every inline chart
+        // block ran first and died on "fetchJson is not defined" — leaving blank charts
+        // on pages that rendered a perfectly valid HTTP 200. Server-side tests cannot
+        // execute JS, so the ordering itself is what gets asserted.
+        foreach (self::PAGES as $script) {
+            $html = $this->run($script)['stdout'];
+
+            $helperAt = strpos($html, 'assets/app.js');
+            $this->assertTrue($helperAt !== false, "{$script} does not load assets/app.js");
+
+            foreach (['fetchJson(', 'drawChart('] as $symbol) {
+                $useAt = strpos($html, $symbol);
+                if ($useAt === false) {
+                    continue;
+                }
+                $this->assertTrue(
+                    $helperAt < $useAt,
+                    "{$script} calls {$symbol} before assets/app.js is loaded"
+                );
+            }
+        }
+    }
+
+    public function testHelperIsLoadedInTheHead(): void
+    {
+        $html = $this->run('index.php')['stdout'];
+        $headEnd = strpos($html, '</head>');
+        $helperAt = strpos($html, 'assets/app.js');
+        $this->assertTrue($headEnd !== false && $helperAt !== false);
+        $this->assertTrue($helperAt < $headEnd, 'assets/app.js must load in <head>, before any page script');
     }
 
     public function testInletPressIsLabelledAsSuspect(): void

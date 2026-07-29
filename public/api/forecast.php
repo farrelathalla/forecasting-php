@@ -15,7 +15,10 @@ Json::endpoint(static function () use ($db): array {
     if (!in_array($target, Domain::TARGETS, true)) {
         Json::error('unknown target: ' . $target, 400);
     }
-    $historyHours = max(1, min(336, Json::intQuery('hours', 48)));
+    // Default to the full model context (14 d). A shorter default window lands squarely
+    // inside the gap between the seeded extract and the start of live polling, so the
+    // chart would come up empty on perfectly healthy data.
+    $historyHours = max(1, min(336, Json::intQuery('hours', 336)));
 
     $grid = new GridRepository($db);
     $forecasts = new ForecastRepository($db);
@@ -52,14 +55,26 @@ Json::endpoint(static function () use ($db): array {
 
     $signal = Domain::signalFromTarget($target);
 
+    // Reported so the UI can explain an empty-looking chart instead of leaving the
+    // operator to guess whether the system is broken or the history simply has a hole.
+    $known = 0;
+    foreach ($history as $row) {
+        if ($row['value'] !== null) {
+            $known++;
+        }
+    }
+    $expected = max(1, (int) round($historyHours * 60 / Domain::MODEL_FREQ_MIN));
+
     return [
-        'target'   => $target,
-        'unit'     => Domain::UNITS[$signal] ?? ($target === 'HEADER_PRESSURE' ? 'kg/cm2' : ''),
-        'origin'   => $origin,
-        'run'      => $run,
-        'history'  => $history,
-        'forecast' => $band,
-        'realised' => $realised,
-        'targets'  => Domain::TARGETS,
+        'target'           => $target,
+        'unit'             => Domain::UNITS[$signal] ?? ($target === 'HEADER_PRESSURE' ? 'kg/cm2' : ''),
+        'origin'           => $origin,
+        'run'              => $run,
+        'history'          => $history,
+        'history_points'   => $known,
+        'history_coverage' => min(1.0, $known / $expected),
+        'forecast'         => $band,
+        'realised'         => $realised,
+        'targets'          => Domain::TARGETS,
     ];
 });

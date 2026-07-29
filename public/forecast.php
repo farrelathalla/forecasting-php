@@ -39,14 +39,16 @@ Page::open('Forecast', 'forecast.php');
   <label for="hours">Riwayat</label>
   <select id="hours">
     <option value="24">24 jam</option>
-    <option value="48" selected>48 jam</option>
+    <option value="48">48 jam</option>
     <option value="168">7 hari</option>
-    <option value="336">14 hari (konteks penuh)</option>
+    <option value="336" selected>14 hari (konteks penuh)</option>
   </select>
 
   <button id="refresh">Muat ulang</button>
   <span id="unit" class="muted"></span>
 </div>
+
+<div id="gapnote"></div>
 
 <div class="card">
   <canvas id="chart"></canvas>
@@ -96,6 +98,23 @@ function load() {
   var hours = document.getElementById('hours').value;
   fetchJson('api/forecast.php?target=' + encodeURIComponent(target) + '&hours=' + hours).then(function (d) {
     document.getElementById('unit').textContent = d.unit ? '(' + d.unit + ')' : '';
+
+    // Explain a sparse chart rather than letting it look broken. The extract ends
+    // 2026-07-22 and live polling starts later, so a short window can legitimately
+    // contain almost nothing.
+    var note = document.getElementById('gapnote');
+    if (d.history_coverage < 0.5) {
+      note.className = 'banner banner-info';
+      note.innerHTML = 'Riwayat pada jendela ini hanya terisi <strong>' +
+        (d.history_coverage * 100).toFixed(1) + '%</strong> (' + d.history_points +
+        ' titik). Ini bukan kerusakan: ekstrak semai berhenti 2026-07-22 sedangkan polling ' +
+        'live baru mulai belakangan, jadi ada celah nyata di tengahnya. Garis sengaja ' +
+        'diputus di celah itu, bukan disambung, karena menyambungnya berarti mengarang data.';
+    } else {
+      note.className = '';
+      note.innerHTML = '';
+    }
+
     render(document.getElementById('chart'), d, 380);
   });
 }
@@ -112,7 +131,7 @@ targets.forEach(function (t) {
   card.className = 'card';
   card.innerHTML = '<h3>' + t + '</h3><canvas></canvas>';
   tiles.appendChild(card);
-  fetchJson('api/forecast.php?target=' + encodeURIComponent(t) + '&hours=24').then(function (d) {
+  fetchJson('api/forecast.php?target=' + encodeURIComponent(t) + '&hours=168').then(function (d) {
     render(card.querySelector('canvas'), d, 190);
   });
 });

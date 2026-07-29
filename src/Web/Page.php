@@ -30,6 +30,7 @@ final class Page
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{$escaped} — {$appEscaped}</title>
         <link rel="stylesheet" href="assets/app.css">
+        <script src="assets/app.js"></script>
         </head>
         <body>
         <header class="topbar">
@@ -71,7 +72,6 @@ final class Page
           </p>
           <p class="muted">&copy; {$year} &middot; dibangun di atas temuan notebook riset TBW</p>
         </footer>
-        <script src="assets/app.js"></script>
         </body>
         </html>
         HTML;

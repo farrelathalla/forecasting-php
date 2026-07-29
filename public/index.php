@@ -170,7 +170,7 @@ Page::open('Dashboard', 'index.php');
 </div>
 
 <script>
-fetchJson('api/forecast.php?target=<?= rawurlencode(Domain::TARGETS[3]) ?>&hours=48').then(function (d) {
+fetchJson('api/forecast.php?target=<?= rawurlencode(Domain::TARGETS[3]) ?>&hours=336').then(function (d) {
   var hist = d.history.map(function (p) { return { x: new Date(p.ts.replace(' ', 'T')), y: p.value }; });
   var med  = d.forecast.map(function (p) { return { x: new Date(p.ts.replace(' ', 'T')), y: p.q50 }; });
   var band = d.forecast.map(function (p) { return { x: new Date(p.ts.replace(' ', 'T')), lo: p.q10, hi: p.q90 }; });
