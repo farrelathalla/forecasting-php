@@ -1,0 +1,8 @@
+.env
+service/.venv/
+service/__pycache__/
+service/.pytest_cache/
+var/
+*.log
+.DS_Store
+Thumbs.db

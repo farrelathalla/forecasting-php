@@ -1,0 +1,21 @@
+# Chronos-2 inference sidecar.
+#
+# Two rules learned by breaking a real run, both documented in ../CLAUDE.md:
+#   1. Never pass -U to pip here. Eager upgrading is what dragged one run through
+#      torch 2.12 -> 2.4.1 -> 2.13.0 and killed 432 fits with ImportError on compiled
+#      extensions. pip's default only-if-needed strategy is the correct one.
+#   2. Give every package a lower bound. With an unsatisfiable dependency pip walks
+#      backwards until something installs, then fails at import instead of at install.
+#
+# chronos-forecasting 2.x requires transformers<5, while the notebook environment ships
+# transformers 5.x. Installing into a venv created with --system-site-packages lets the
+# venv shadow transformers for this service only and leaves the notebook env untouched.
+
+chronos-forecasting>=2.0,<3
+transformers>=4.49,<5
+einops>=0.7,<1
+torch>=2.0,<3
+numpy>=1.24,<3
+fastapi>=0.110
+uvicorn>=0.27
+pydantic>=2.6
