@@ -75,20 +75,23 @@ var accent = getComputedStyle(document.documentElement).getPropertyValue('--acce
 var textCol = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
 
 function toPoints(rows, key) {
-  return rows.map(function (p) { return { x: new Date(p.ts.replace(' ', 'T')), y: p[key] }; });
+  return rows.map(function (p) { return { x: toDate(p.ts), y: p[key] }; });
 }
 
 function render(canvas, d, height) {
   drawChart(canvas, {
     height: height,
-    marker: d.origin ? new Date(d.origin.replace(' ', 'T')) : null,
-    band: { points: d.forecast.map(function (p) {
-      return { x: new Date(p.ts.replace(' ', 'T')), lo: p.q10, hi: p.q90 };
-    }) },
+    marker: d.origin ? toDate(d.origin) : null,
+    band: {
+      points: d.forecast.map(function (p) { return { x: toDate(p.ts), lo: p.q10, hi: p.q90 }; }),
+      label: 'interval 80%'
+    },
     series: [
-      { points: d.history.map(function (p) { return { x: new Date(p.ts.replace(' ', 'T')), y: p.value }; }), color: textCol, width: 1.4 },
-      { points: toPoints(d.forecast, 'q50'), color: accent, width: 2 },
-      { points: d.realised.map(function (p) { return { x: new Date(p.ts.replace(' ', 'T')), y: p.value }; }), color: textCol, width: 1.4 }
+      { points: d.history.map(function (p) { return { x: toDate(p.ts), y: p.value }; }),
+        color: textCol, width: 1.4, label: 'aktual' },
+      { points: toPoints(d.forecast, 'q50'), color: accent, width: 2, label: 'ramalan q50' },
+      { points: d.realised.map(function (p) { return { x: toDate(p.ts), y: p.value }; }),
+        color: textCol, width: 1.4, label: 'terealisasi' }
     ]
   });
 }
@@ -136,10 +139,6 @@ targets.forEach(function (t) {
   });
 });
 
-window.addEventListener('resize', function () {
-  clearTimeout(window.__rz);
-  window.__rz = setTimeout(function () { location.reload(); }, 400);
-});
 </script>
 
 <?php Page::close(); ?>

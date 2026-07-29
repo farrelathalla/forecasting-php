@@ -14,7 +14,7 @@ use Tests\DbTestCase;
  */
 final class WebEndpointTest extends DbTestCase
 {
-    private const API = ['status.php', 'forecast.php', 'alarms.php', 'scorecard.php'];
+    private const API = ['status.php', 'forecast.php', 'alarms.php', 'scorecard.php', 'live.php'];
     private const PAGES = ['index.php', 'forecast.php', 'alarms.php', 'model.php'];
 
     /** @var resource|null */
@@ -190,6 +190,78 @@ final class WebEndpointTest extends DbTestCase
         $result = $this->run('index.php');
         $this->assertStringContains('RETIRED', $result['stdout']);
         $this->assertStringContains('TBW2', $result['stdout']);
+    }
+
+    public function testLiveEndpointServesPollResolutionNotTheModelGrid(): void
+    {
+        // The live chart exists because the 15-minute modelling grid only moves four
+        // times an hour and therefore never looks alive. This endpoint must serve the
+        // raw readings instead, or the whole point is lost.
+        $this->db->execute(
+            'INSERT INTO reading_raw (asset, signal_name, observed_at, value) VALUES
+                (?,?,?,?), (?,?,?,?), (?,?,?,?)',
+            [
+                'TBW1', 'POWER', date('Y-m-d H:i:s', time() - 180), 183.0,
+                'TBW1', 'POWER', date('Y-m-d H:i:s', time() - 120), 184.0,
+                'TBW3', 'POWER', date('Y-m-d H:i:s', time() - 60), 171.0,
+            ]
+        );
+
+        $body = json_decode($this->run('api/live.php', ['signal' => 'POWER', 'minutes' => 60])['stdout'], true);
+
+        $this->assertSame('POWER', $body['signal']);
+        $this->assertSame('kW', $body['unit']);
+        $this->assertSame(60, $body['resolution_sec']);
+        $this->assertCount(2, $body['assets']['TBW1']);
+        $this->assertCount(1, $body['assets']['TBW3']);
+        $this->assertFalse($body['incremental']);
+    }
+
+    public function testLiveEndpointReturnsOnlyNewerPointsWhenGivenSince(): void
+    {
+        // The page polls every 15 s. Refetching the whole window each time would move
+        // the same few hundred rows across the wire for nothing.
+        $old = date('Y-m-d H:i:s', time() - 300);
+        $new = date('Y-m-d H:i:s', time() - 60);
+        $this->db->execute(
+            'INSERT INTO reading_raw (asset, signal_name, observed_at, value) VALUES (?,?,?,?), (?,?,?,?)',
+            ['TBW1', 'POWER', $old, 183.0, 'TBW1', 'POWER', $new, 186.0]
+        );
+
+        $body = json_decode($this->run('api/live.php', ['signal' => 'POWER', 'since' => $old])['stdout'], true);
+
+        $this->assertTrue($body['incremental']);
+        $this->assertCount(1, $body['assets']['TBW1'], 'since must be exclusive: the client already holds that point');
+        $this->assertFloatEquals(186.0, $body['assets']['TBW1'][0]['value'], 1e-9);
+    }
+
+    public function testLiveEndpointRejectsAnUnknownSignal(): void
+    {
+        $body = json_decode($this->run('api/live.php', ['signal' => 'NONSENSE'])['stdout'], true);
+        $this->assertTrue(isset($body['error']));
+    }
+
+    public function testLiveEndpointReportsLatestTimestampForIncrementalPolling(): void
+    {
+        $at = date('Y-m-d H:i:s', time() - 60);
+        $this->db->execute(
+            'INSERT INTO reading_raw (asset, signal_name, observed_at, value) VALUES (?,?,?,?)',
+            ['TBW1', 'FLOWRATE', $at, 33.4]
+        );
+        $body = json_decode($this->run('api/live.php', ['signal' => 'FLOWRATE'])['stdout'], true);
+        $this->assertSame($at, $body['latest_ts']);
+        $this->assertSame('m3/min', $body['unit']);
+    }
+
+    public function testDashboardCarriesTheLiveChartAndItsControls(): void
+    {
+        $html = $this->run('index.php')['stdout'];
+        $this->assertStringContains('id="live"', $html);
+        $this->assertStringContains('api/live.php', $html);
+        $this->assertStringContains('id="livesignal"', $html);
+        // The 1-minute ceiling is a property of the snapshot API, not of the chart, and
+        // the page has to say so or someone will try to fix it in the wrong place.
+        $this->assertStringContains('satu titik per menit', $html);
     }
 
     public function testHelperScriptLoadsBeforeAnyInlineScriptThatUsesIt(): void

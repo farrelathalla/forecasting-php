@@ -35,6 +35,12 @@ foreach (array_slice($argv, 1) as $arg) {
 putenv('TBW_INTEGRATION=' . ($integration ? '1' : '0'));
 putenv('TBW_TESTING=1');
 
+// Match the application's timezone. PHP CLI defaults to UTC while bin/_bootstrap.php and
+// public/bootstrap.php set Asia/Jakarta, so without this a test that writes a row with
+// date() and then asks the app to find it is off by seven hours — and fails for a reason
+// that has nothing to do with what it is testing.
+date_default_timezone_set(\Tbw\Config::load()->str('app.timezone', 'Asia/Jakarta'));
+
 $files = [];
 $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__, FilesystemIterator::SKIP_DOTS));
 foreach ($it as $file) {
