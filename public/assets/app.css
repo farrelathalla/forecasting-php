@@ -48,6 +48,14 @@ body {
   flex-wrap: wrap;
 }
 
+/* Corporate mark, left of the station name. Height-constrained with width:auto so a
+   re-exported logo of a different aspect ratio cannot stretch the bar. */
+.brand-logo {
+  height: 40px; width: auto; display: block; flex: none;
+  padding-right: 0.9rem; margin-right: 0.15rem;
+  border-right: 1px solid var(--line);
+}
+
 .brand { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; }
 .brand .sub { color: var(--muted); font-size: 0.82rem; margin-left: 0.35rem; }
 .brand .dot {

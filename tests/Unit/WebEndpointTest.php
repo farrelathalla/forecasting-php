@@ -383,6 +383,33 @@ final class WebEndpointTest extends DbTestCase
         }
     }
 
+    public function testEveryPageCarriesTheCorporateFaviconAndLogo(): void
+    {
+        // Branding lives in Page::open(), so it reaches every page at once -- and this
+        // asserts it, because the failure mode is silent: a missing favicon or a mistyped
+        // asset path still renders a perfectly valid HTTP 200 with a broken image.
+        $root = dirname(__DIR__, 2) . '/public';
+
+        foreach (self::PAGES as $script) {
+            $html = $this->run($script)['stdout'];
+
+            $this->assertStringContains('assets/img/logo-daesang.webp', $html, "{$script} has no navbar logo");
+            $this->assertStringContains('rel="icon"', $html, "{$script} declares no favicon");
+            $this->assertStringContains('assets/img/favicon.webp', $html, "{$script} has no webp favicon");
+        }
+
+        // The markup is worthless if the files are not deployed next to it.
+        foreach ([
+            '/assets/img/logo-daesang.webp',
+            '/assets/img/favicon.webp',
+            '/assets/img/favicon-32.png',
+            '/assets/img/apple-touch-icon.png',
+            '/favicon.ico',
+        ] as $asset) {
+            $this->assertTrue(is_file($root . $asset), "missing deployed asset: {$asset}");
+        }
+    }
+
     public function testHelperIsLoadedInTheHead(): void
     {
         $html = $this->run('index.php')['stdout'];

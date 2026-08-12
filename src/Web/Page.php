@@ -27,11 +27,18 @@ final class Page
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{$escaped} — {$appEscaped}</title>
+        <link rel="icon" type="image/webp" href="assets/img/favicon.webp">
+        <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="assets/img/favicon-192.png">
+        <link rel="icon" href="favicon.ico" sizes="any">
+        <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png">
         <link rel="stylesheet" href="assets/app.css">
         <script src="assets/app.js"></script>
         </head>
         <body>
         <header class="topbar">
+          <img class="brand-logo" src="assets/img/logo-daesang.webp"
+               alt="Daesang Ingredients Indonesia" width="40" height="39">
           <div class="brand">
             <span class="dot"></span>
             <strong>TBW</strong> Pump Station
