@@ -159,6 +159,29 @@ final class GridRepository
     }
 
     /**
+     * Last timestamp carrying a real value, per asset.
+     *
+     * The dashboard needs this to say when a pump was last heard from rather than assert
+     * from a constant which pumps exist. An asset that stopped reporting months ago is
+     * only distinguishable from one that stopped an hour ago by its own last reading --
+     * and if a stopped asset ever comes back, this is what notices without an edit.
+     *
+     * @return array<string,string> asset => timestamp
+     */
+    public function lastSeenPerAsset(): array
+    {
+        $rows = $this->db->select(
+            'SELECT asset, MAX(ts) AS last_ts FROM grid_15min
+              WHERE value IS NOT NULL GROUP BY asset'
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(string) $r['asset']] = (string) $r['last_ts'];
+        }
+        return $out;
+    }
+
+    /**
      * Fraction of the last CONTEXT steps that carry a real value, per target. Reported on
      * the dashboard so a forecast made on a thin context is never read as if it were made
      * on a full one.

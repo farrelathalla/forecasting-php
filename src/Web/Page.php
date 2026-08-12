@@ -5,17 +5,15 @@ namespace Tbw\Web;
 
 use Tbw\Config;
 
-/** Shared page chrome. Plain PHP templating — no engine, nothing to install. */
+/**
+ * Shared page chrome. Plain PHP templating — no engine, nothing to install.
+ *
+ * There is no nav because there is one page. Splitting a forecast chart and its alarm
+ * table across four tabs made an operator click to answer a single question.
+ */
 final class Page
 {
-    private const NAV = [
-        'index.php'    => 'Dashboard',
-        'forecast.php' => 'Forecast',
-        'alarms.php'   => 'Peringatan Dini',
-        'model.php'    => 'Kesehatan Model',
-    ];
-
-    public static function open(string $title, string $active = 'index.php'): void
+    public static function open(string $title): void
     {
         $config = Config::load();
         $appTitle = $config->str('app.title', 'TBW Forecast');
@@ -37,18 +35,8 @@ final class Page
           <div class="brand">
             <span class="dot"></span>
             <strong>TBW</strong> Pump Station
-            <span class="sub">Driyorejo, Gresik</span>
+            <span class="sub">Driyorejo, Gresik &middot; peramalan &amp; peringatan dini</span>
           </div>
-          <nav>
-        HTML;
-
-        foreach (self::NAV as $href => $label) {
-            $class = $href === $active ? ' class="active"' : '';
-            echo "<a href=\"{$href}\"{$class}>{$label}</a>";
-        }
-
-        echo <<<HTML
-          </nav>
           <div class="clock" id="clock"></div>
         </header>
         <main>
@@ -57,20 +45,14 @@ final class Page
 
     public static function close(): void
     {
-        $year = date('Y');
+        // Deliberately bare. Everything that used to live down here -- model name,
+        // horizon, grid resolution, the unit table -- was provenance for the people who
+        // built the system, printed at the people who operate it. The facts that change
+        // how a shift is run are on the page itself, in the row they belong to.
         echo <<<HTML
         </main>
         <footer>
-          <p>
-            Chronos-2 zero-shot &middot; horizon 24 jam &middot; grid 15 menit &middot;
-            batas SPC dibekukan dari jendela sehat 2026-05-20 &rarr; 2026-06-05
-          </p>
-          <p class="muted">
-            Satuan: FLOWRATE m&sup3;/min &middot; POWER kW &middot; MOTOR_CURRENT A &middot;
-            OUTLET_PRESSURE kg/cm&sup2; &middot; suhu &deg;C.
-            <strong>INLET_PRESS bukan tekanan</strong> &mdash; lihat catatan F4 di PLAN.md.
-          </p>
-          <p class="muted">&copy; {$year} &middot; dibangun di atas temuan notebook riset TBW</p>
+          <p>TBW Pump Station &middot; Driyorejo, Gresik &middot; halaman menyegarkan sendiri tiap 5 menit</p>
         </footer>
         </body>
         </html>

@@ -56,47 +56,99 @@ body {
   box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.2);
 }
 
-.topbar nav { display: flex; gap: 0.25rem; flex-wrap: wrap; }
-.topbar nav a {
-  color: var(--muted);
-  text-decoration: none;
-  padding: 0.35rem 0.7rem;
-  border-radius: 6px;
-  font-size: 0.92rem;
-}
-.topbar nav a:hover { background: var(--panel-2); color: var(--text); }
-.topbar nav a.active { background: var(--panel-2); color: var(--accent); font-weight: 600; }
-
 .clock { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.88rem; }
 
-main { padding: 1.25rem; max-width: 1400px; margin: 0 auto; }
+main { padding: 1.25rem; max-width: 1280px; margin: 0 auto; }
 
-h1 { font-size: 1.35rem; margin: 0 0 0.25rem; }
-h2 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; }
-.lede { color: var(--muted); margin: 0 0 1.25rem; max-width: 62rem; }
-
-.grid { display: grid; gap: 1rem; }
-.grid-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
-.grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+h2 { font-size: 1.02rem; margin: 0; }
 
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1rem 1.1rem;
+  padding: 1rem 1.15rem 1.15rem;
+  margin-bottom: 1rem;
 }
-.card h3 { margin: 0 0 0.75rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
 
-.metric { display: flex; justify-content: space-between; align-items: baseline; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
-.metric:last-child { border-bottom: 0; }
-.metric .label { color: var(--muted); font-size: 0.86rem; }
-.metric .value { font-variant-numeric: tabular-nums; font-weight: 600; }
-.metric .unit { color: var(--muted); font-weight: 400; font-size: 0.8rem; margin-left: 0.2rem; }
+.card-head {
+  display: flex; align-items: center; gap: 0.75rem;
+  flex-wrap: wrap; margin-bottom: 0.9rem;
+}
+.card-head .controls { margin-left: auto; margin-bottom: 0; }
 
-.stat { text-align: center; padding: 0.5rem 0; }
-.stat .big { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; display: block; }
-.stat .cap { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+/* Status strip: the four numbers worth reading before the chart. */
+.tiles {
+  display: grid; gap: 1rem; margin-bottom: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+.tile .cap {
+  color: var(--muted); font-size: 0.76rem; text-transform: uppercase;
+  letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4rem;
+}
+.tile .big {
+  font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+.tile .big small { font-size: 0.8rem; font-weight: 500; color: var(--muted); margin-left: 0.25rem; }
+.tile .big.model { font-size: 1.35rem; }
+.tile .sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+
+.tile-ok    { border-left-color: var(--ok); }
+.tile-ok .big    { color: var(--ok); }
+.tile-warn  { border-left-color: var(--warn); }
+.tile-warn .big  { color: var(--warn); }
+.tile-alarm { border-left-color: var(--alarm); }
+.tile-alarm .big { color: var(--alarm); }
+
+.tile-retired { opacity: 0.62; }
+.tile-stale { border-left-color: var(--warn); }
+.tile .sub.is-stale { color: var(--warn); }
+
+.verdict { margin: 0 0 0.9rem; font-size: 0.95rem; max-width: 70rem; line-height: 1.6; }
+.verdict code { font-size: 0.85em; }
+
+.drift { font-weight: 600; }
+.drift.is-alarm { color: var(--alarm); }
+.drift.is-warn { color: var(--warn); }
+
+/* What a channel is, under what it is called. The name alone never says enough: these
+   are relationships between two signals, not a signal anybody can point at on the skid. */
+.help { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 400; margin-top: 0.1rem; }
+.asset-tag {
+  display: inline-block; margin-left: 0.35rem; padding: 0.05rem 0.4rem;
+  border-radius: 4px; background: var(--panel-2); color: var(--muted);
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+}
+.unit { color: var(--muted); font-size: 0.75rem; margin-left: 0.15rem; }
+
+/* Distance from the healthy baseline, as a word plus a bar. The sigma figure it is
+   derived from stays in the cell's hover text, so the number is still traceable
+   without being the thing an operator has to decode first. */
+.gauge { display: flex; flex-direction: column; gap: 0.3rem; min-width: 130px; }
+.gauge-label { font-size: 0.85rem; font-weight: 600; }
+.gauge-label.is-alarm { color: var(--alarm); }
+.gauge-label.is-warn { color: var(--warn); }
+.gauge-track {
+  display: block; height: 5px; border-radius: 999px;
+  background: var(--panel-2); overflow: hidden;
+}
+.gauge-fill { display: block; height: 100%; border-radius: 999px; background: var(--ok); }
+.gauge-fill.is-warn { background: var(--warn); }
+.gauge-fill.is-alarm { background: var(--alarm); }
+
+.foot-note {
+  color: var(--muted); font-size: 0.8rem; line-height: 1.55;
+  margin: 0.9rem 0 0; padding-top: 0.75rem; border-top: 1px solid var(--line);
+}
+.foot-note strong { color: var(--text); }
 
 .pill {
   display: inline-block; padding: 0.12rem 0.55rem; border-radius: 999px;
@@ -143,15 +195,8 @@ button:hover { border-color: var(--accent); }
 .swatch.band { height: 10px; background: var(--band); }
 
 footer {
-  padding: 1.5rem 1.25rem 2.5rem; max-width: 1400px; margin: 0 auto;
-  color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); margin-top: 2rem;
+  padding: 1.25rem 1.25rem 2rem; max-width: 1280px; margin: 0 auto;
+  color: var(--muted); font-size: 0.8rem; border-top: 1px solid var(--line);
 }
 footer p { margin: 0.25rem 0; }
 .muted { color: var(--muted); }
-
-.note {
-  background: var(--panel-2); border-left: 3px solid var(--accent);
-  padding: 0.6rem 0.9rem; border-radius: 0 6px 6px 0; font-size: 0.86rem;
-  color: var(--muted); margin: 0.75rem 0;
-}
-.note strong { color: var(--text); }

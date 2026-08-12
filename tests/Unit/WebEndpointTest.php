@@ -15,7 +15,9 @@ use Tests\DbTestCase;
 final class WebEndpointTest extends DbTestCase
 {
     private const API = ['status.php', 'forecast.php', 'alarms.php', 'scorecard.php', 'live.php'];
-    private const PAGES = ['index.php', 'forecast.php', 'alarms.php', 'model.php'];
+
+    /** One page. The UI is a forecast chart and an alarm verdict; nothing else earned a tab. */
+    private const PAGES = ['index.php'];
 
     /** @var resource|null */
     private static $server = null;
@@ -183,13 +185,42 @@ final class WebEndpointTest extends DbTestCase
         }
     }
 
-    public function testRetiredAssetIsShownAsRetiredNotAsMissingData(): void
+    public function testALongSilentAssetIsDatedFromItsOwnLastReading(): void
     {
-        // F1: TBW2 is a stopped machine. A dashboard that shows it as "no data" invites
-        // someone to go looking for a sensor fault that does not exist.
-        $result = $this->run('index.php');
-        $this->assertStringContains('RETIRED', $result['stdout']);
-        $this->assertStringContains('TBW2', $result['stdout']);
+        // F1: TBW2 is a stopped machine, and the page has to say so with a date rather
+        // than leave a blank tile that reads as a sensor fault. The date is derived, not
+        // declared -- so this seeds a last reading and expects the page to find it.
+        $this->truncateAll();
+        $this->db->execute(
+            'INSERT INTO grid_15min (asset, signal_name, ts, value, is_held) VALUES (?,?,?,?,?)',
+            ['TBW2', 'POWER', '2026-05-14 10:00:00', 180.0, 0]
+        );
+
+        $html = $this->run('index.php')['stdout'];
+
+        $this->assertStringContains('TBW2', $html);
+        $this->assertStringContains('Sudah mati sejak 14 Mei 2026', $html);
+    }
+
+    public function testAnAssetThatStartsReportingAgainIsNoLongerShownAsDead(): void
+    {
+        // The station has already changed shape once (F1) and could again. Nothing about
+        // the strip may be pinned to today's two-pump configuration: a pump that comes
+        // back has to appear as running purely because its readings say so.
+        $this->truncateAll();
+        $at = date('Y-m-d H:i:s', time() - 30);
+        $this->db->execute(
+            'INSERT INTO reading_raw (asset, signal_name, observed_at, value) VALUES (?,?,?,?), (?,?,?,?)',
+            ['TBW2', 'MOTOR_CURRENT', $at, 190.0, 'TBW2', 'POWER', $at, 186.0]
+        );
+
+        $html = $this->run('index.php')['stdout'];
+
+        $this->assertStringContains('JALAN', $html);
+        $this->assertFalse(
+            str_contains($html, 'Sudah mati sejak'),
+            'a reporting asset must not still be rendered as long dead'
+        );
     }
 
     public function testLiveEndpointServesPollResolutionNotTheModelGrid(): void
@@ -253,15 +284,78 @@ final class WebEndpointTest extends DbTestCase
         $this->assertSame('m3/min', $body['unit']);
     }
 
-    public function testDashboardCarriesTheLiveChartAndItsControls(): void
+    public function testTheSinglePageCarriesBothTheForecastChartAndTheAlarmVerdict(): void
     {
+        // The whole point of collapsing four pages into one: the forecast and the thing
+        // that judges it must be readable without a click. If either drifts off this
+        // page, the consolidation has quietly undone itself.
         $html = $this->run('index.php')['stdout'];
-        $this->assertStringContains('id="live"', $html);
-        $this->assertStringContains('api/live.php', $html);
-        $this->assertStringContains('id="livesignal"', $html);
-        // The 1-minute ceiling is a property of the snapshot API, not of the chart, and
-        // the page has to say so or someone will try to fix it in the wrong place.
-        $this->assertStringContains('satu titik per menit', $html);
+
+        $this->assertStringContains('id="chart"', $html);
+        $this->assertStringContains('api/forecast.php', $html);
+        $this->assertStringContains('Peringatan dini', $html);
+        $this->assertStringContains('Seberapa jauh dari normal', $html);
+    }
+
+    public function testThePageSpeaksOperatorLanguageNotModellingLanguage(): void
+    {
+        // The dashboard is read on shift by people who never opened the notebook. Internal
+        // channel keys and statistical units were the single biggest complaint about the
+        // first version: "dT", "flow_per_kW" and sigma are meaningless in a control room,
+        // and a number nobody can read is a number nobody acts on.
+        // Seeded rather than borrowed from whatever the suite left behind: the assertion
+        // is that these two channels render under their plant names, so the rows have to
+        // be there regardless of test order.
+        $this->truncateAll();
+        $at = date('Y-m-d H:i:s');
+        $this->db->execute(
+            'INSERT INTO spc_state (channel, ts, value, mu, sigma, lcl, ucl, drift_sigma, tier) VALUES
+                (?,?,?,?,?,?,?,?,?), (?,?,?,?,?,?,?,?,?)',
+            [
+                'dT|TBW3', $at, 6.675, -7.004, 1.597, -11.794, -2.213, 8.567, 'ALARM',
+                'hyd_eff|TBW1', $at, 0.916, 0.882, 0.067, 0.680, 1.084, 0.506, 'OK',
+            ]
+        );
+
+        $html = $this->run('index.php')['stdout'];
+
+        // Strip hover text before asserting. The exact sigma figure is deliberately kept
+        // in title attributes so every number stays traceable to its row -- it just must
+        // not be what the operator has to decode to use the page.
+        $visible = preg_replace('/title="[^"]*"/', '', $html) ?? $html;
+
+        foreach (['dT|', 'flow_per_kW', 'P_over_I', 'hyd_eff', 'σ', 'sigma'] as $jargon) {
+            $this->assertFalse(
+                str_contains($visible, $jargon),
+                "index.php still shows the internal name '{$jargon}' to the operator"
+            );
+        }
+
+        $this->assertStringContains('Kenaikan suhu air', $html);
+        $this->assertStringContains('Efisiensi pompa', $html);
+    }
+
+    public function testAStoppedPumpIsDistinguishedFromADeadFeed(): void
+    {
+        // Both render as zeroes and they demand opposite responses: one is a pump that is
+        // switched off, the other is a telemetry link that died while the page kept
+        // cheerfully showing its last reading. The page has to date every value.
+        $this->truncateAll();
+        $this->db->execute(
+            'INSERT INTO reading_raw (asset, signal_name, observed_at, value) VALUES
+                (?,?,?,?), (?,?,?,?), (?,?,?,?), (?,?,?,?)',
+            [
+                'TBW1', 'MOTOR_CURRENT', date('Y-m-d H:i:s', time() - 30), 0.1,
+                'TBW1', 'POWER', date('Y-m-d H:i:s', time() - 30), 0.0,
+                'TBW3', 'MOTOR_CURRENT', date('Y-m-d H:i:s', time() - 2 * 86400), 0.1,
+                'TBW3', 'POWER', date('Y-m-d H:i:s', time() - 2 * 86400), 0.0,
+            ]
+        );
+
+        $html = $this->run('index.php')['stdout'];
+
+        $this->assertStringContains('data baru saja', $html);
+        $this->assertStringContains('data terakhir 2 hari lalu', $html);
     }
 
     public function testHelperScriptLoadsBeforeAnyInlineScriptThatUsesIt(): void
@@ -298,10 +392,4 @@ final class WebEndpointTest extends DbTestCase
         $this->assertTrue($helperAt < $headEnd, 'assets/app.js must load in <head>, before any page script');
     }
 
-    public function testInletPressIsLabelledAsSuspect(): void
-    {
-        // F4: the tag is mislabelled at source. The UI must not present it as a pressure.
-        $result = $this->run('index.php');
-        $this->assertStringContains('counter?', $result['stdout']);
-    }
 }

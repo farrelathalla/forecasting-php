@@ -130,14 +130,31 @@ target, skor dan nilai SPC dibangun.
 
 ## Halaman
 
-| Halaman | Isi |
-|---|---|
-| `index.php` | Nilai live per aset, status running, ringkasan alarm, grafik ramalan |
-| `forecast.php` | 9 target, riwayat + median + pita 80%, penanda titik asal |
-| `alarms.php` | SPC fisika, proyeksi tanggal, status tier, riwayat transisi |
-| `model.php` | Papan skor MASE/WQL/cov80, pertumbuhan error, kesehatan sistem |
+**Satu halaman, `index.php`.** Susunannya mengikuti satu-satunya pertanyaan yang dibawa
+operator waktu membukanya — "24 jam ke depan aman atau tidak, dan ada yang melenceng?":
 
-Endpoint JSON di `public/api/` kalau mau disambungkan ke SCADA atau dashboard lain.
+1. **Kartu status** — kondisi stasiun, lalu satu kartu per pompa. Daftar pompanya
+   **diturunkan dari data**, bukan dari konstanta: gabungan aset yang sedang dikirim API
+   dan yang ada di riwayat, dengan status (JALAN / MATI / lama tidak mengirim) dibaca dari
+   pembacaan terakhir tiap aset. Kalau susunan stasiun berubah lagi seperti Mei 2026 (F1),
+   halaman ikut berubah tanpa edit kode.
+2. **Grafik ramalan 24 jam** — aktual, median, pita 80%, penanda titik asal. Target bisa
+   diganti lewat dropdown; ke-9 target ada di situ, tidak perlu pindah halaman.
+3. **Peringatan dini** — tabel kanal fisika terhadap batas beku, plus tanggal proyeksi Huber.
+
+Teksnya ditulis untuk ruang kontrol, bukan untuk notebook yang menghasilkannya. Nama
+internal (`dT`, `flow_per_kW`) dan satuan statistik (sigma) diterjemahkan oleh
+`src/Web/Labels.php` — angka sigma persisnya tetap ada di *hover* tiap baris supaya setiap
+nilai masih bisa ditelusuri ke barisnya, tapi bukan itu yang harus dibaca operator lebih
+dulu. Ada tes yang menjaga jargon tidak bocor balik ke layar.
+
+Sebelumnya ini tersebar di empat tab (`forecast.php`, `alarms.php`, `model.php`). Memisah
+grafik dari alarm yang menilainya berarti operator harus mengklik untuk menjawab satu
+pertanyaan, jadi ketiganya digabung dan tiga halaman sisanya dihapus.
+
+Endpoint JSON di `public/api/` tetap ada kalau mau disambungkan ke SCADA atau dashboard
+lain — termasuk `scorecard.php` (MASE/WQL/cov80) dan `live.php` (bacaan laju poller), yang
+sekarang tidak lagi punya halaman sendiri.
 
 ---
 
@@ -151,7 +168,7 @@ php tests/run.php --integration      # ikut memanggil API sensor sungguhan
 service/.venv/Scripts/python -m pytest service/test_service.py -q
 ```
 
-196 tes PHP + 11 tes sidecar. Tes sidecar memuat bobot Chronos-2 asli, karena sifat yang
+213 tes PHP + 11 tes sidecar. Tes sidecar memuat bobot Chronos-2 asli, karena sifat yang
 diuji — monotonisitas kuantil, ketahanan terhadap NaN, bentuk keluaran — adalah sifat
 model, dan pipeline palsu tidak membuktikan apa pun tentang yang dideploy.
 
@@ -199,11 +216,11 @@ tertinggi yang tersedia.
 bin/            job CLI (poll, aggregate, forecast, evaluate, seed, migrate, prune, run_all)
 config/         konfigurasi, batas SPC beku, limit proyeksi
 db/schema.sql   skema (idempoten)
-public/         docroot XAMPP: halaman + endpoint JSON + aset
+public/         docroot XAMPP: index.php (satu halaman) + endpoint JSON + aset
 service/        sidecar Chronos-2 (FastAPI) + eksportir histori
 src/            Config, Db, Domain, Ingest, Grid, Physics, Forecast, EarlyWarning,
                 Scoring, Repository, Web
-tests/          196 tes, runner sendiri, tanpa PHPUnit
+tests/          213 tes, runner sendiri, tanpa PHPUnit
 var/            file kerja (di-gitignore)
 ```
 
